@@ -7,7 +7,7 @@ TITLE Project 6 - String Primitives and Macros     (Proj6_tinnelm.asm)
 ; Project Number: 6             Due Date: 3/13/22
 ; Description: This program introduces the programmer and the program. It will then prompt the user to enter 10 signed
 ;              decimal integers. It will validate the user input. It will then display a list of the integers, their sum,
-;              and their average value. The program utilizes macros and will pass all non constant parameters on the stack.
+;              and their average value. The program utilizes macros and will pass all non-constant parameters on the stack.
 
 INCLUDE Irvine32.inc
 
