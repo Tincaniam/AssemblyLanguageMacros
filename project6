@@ -1,0 +1,855 @@
+TITLE Project 6 - String Primitives and Macros     (Proj6_tinnelm.asm)
+
+; Author: Matthew Tinnel
+; Last Modified: 03/10/2022
+; OSU email address: tinnelm@oregonstate.edu
+; Course number/section:   CS271 Section 400
+; Project Number: 6             Due Date: 3/13/22
+; Description: This program introduces the programmer and the program. It will then prompt the user to enter 10 signed
+;              decimal integers. It will validate the user input. It will then display a list of the integers, their sum,
+;              and their average value. The program utilizes macros and will pass all non constant parameters on the stack.
+
+INCLUDE Irvine32.inc
+
+; ---------------------------------------------------------------------------------
+; Name: mGetString
+;
+; Gets a string from the user. Stores the string in memory.
+;
+; Receives:
+; prompt = address of the string to display to the user for a prompt.
+; buffer = address of the string to store user input.
+; len_buffer = maximum length of the string.
+;
+; returns: buffer = address of the string holding the value the user entered.
+; ---------------------------------------------------------------------------------
+mGetString  MACRO    prompt:REQ,buffer:REQ,len_buffer:REQ
+    PUSH    EDX
+    PUSH    ECX
+    MOV     EDX, prompt
+    CALL    WriteString
+    MOV     EDX, buffer
+    MOV     ECX, len_buffer
+    CALL    ReadString
+    MOV     buffer, EDX
+    POP     ECX
+    POP     EDX
+
+ENDM
+
+; ---------------------------------------------------------------------------------
+; Name: mDisplayString
+;
+; Displays the string with the address of the string passed by the user.
+;
+; Receives:
+; string_1 = address of a string to display.
+; ---------------------------------------------------------------------------------
+mDisplayString    MACRO    string_1:REQ
+    PUSH    EDX
+    MOV     EDX, string_1
+    CALL    WriteString
+    POP     EDX
+ENDM
+
+ARRAYSIZE   = 10
+
+.data
+    intro_1		       BYTE    "Hello, my name is Matthew...",0
+	intro_2            BYTE    "and this is my String Primitives and Macros Program!",0
+	intro_3            BYTE    "I will prompt you to enter 10 signed decimal integers.",0
+    intro_4            BYTE    "Each number needs to fit inside a 32 bit register.",0
+    intro_5            BYTE    "After you have finished entering numbers, I will display a list of the integers, their sum, and their average value.",0
+    prompt_1           BYTE    "Please enter a signed number: ",0
+    error_txt          BYTE    "ERROR: You did not enter a signed number or your number was too big.",0
+    display_title      BYTE    "You entered the following numbers: ",0
+    sum_txt            BYTE    "The sum of these numbers is: ",0
+    average_txt        BYTE    "Their truncated average is: ",0
+    farewell_txt       BYTE    "So long, and thanks for all the fish!",0
+    user_input         BYTE    16 DUP(?)
+    sum_num_txt        BYTE    16 DUP(?)
+    reverse_sum        BYTE    16 DUP(?)
+    str_array          SDWORD  ARRAYSIZE DUP(?)
+    num_array          SDWORD  ARRAYSIZE DUP(?)
+    count_1            DWORD   ?
+    count_2            DWORD   ?
+    convert_array_2    SDWORD  ARRAYSIZE DUP(?)
+    byte_count         DWORD   ?
+    num_passed         DWORD   1 DUP(?)
+    convert_num        SDWORD  ?
+    convert_num_2      SDWORD  ?
+    finalnumArray      SDWORD  ARRAYSIZE DUP(?)
+    finalstrArray      BYTE    141 DUP(?)        ; Should be large enough for the maximum string length.
+    avg_num            SDWORD  ?
+    avg_txt            BYTE    16 DUP(?)
+    sum_store          SDWORD  ?
+
+.code
+main PROC
+; --------------
+; Introduction
+; --------------
+    mDisplayString     OFFSET intro_1 
+    CALL               CrLf
+    mDisplayString     OFFSET intro_2
+    CALL               CrLf
+    CALL               CrLf
+    mDisplayString     OFFSET intro_3
+    CALL               CrLf
+    mDisplayString     OFFSET intro_4
+    CALL               CrLf
+    mDisplayString     OFFSET intro_5
+    CALL               CrLf
+    CALL               CrLf
+
+    MOV                ESI, OFFSET finalNumArray    ; finalNumArray holds the array of nums converted from strings.
+    MOV                ECX, ARRAYSIZE
+
+; ----------------------------------------------------------------------------
+; Loops calling ReadVal, storing the user input and not storing invalid input.
+; ----------------------------------------------------------------------------
+_readValLoop:
+    PUSH               OFFSET convert_num_2
+    PUSH               OFFSET user_input
+    PUSH               OFFSET prompt_1
+    PUSH               OFFSET error_txt
+    PUSH               OFFSET str_array
+    PUSH               LENGTHOF str_array
+    PUSH               OFFSET num_array
+    PUSH               OFFSET num_passed
+    PUSH               OFFSET convert_num
+    CALL               ReadVal
+
+    MOV                EAX, convert_num       ; convert_num stores the ascii values converted from a string.
+    CMP                num_passed, 1          ; num_passed holds weather the passed number is valid (1 = True).
+    JNE                _readValLoop
+    MOV                [ESI], EAX
+    ADD                ESI, 4                 ; Increments finalNumArray to the next value.
+    LOOP               _readValLoop
+
+    PUSH               OFFSET sum_store
+    PUSH               OFFSET avg_txt
+    PUSH               OFFSET avg_num
+    PUSH               OFFSET reverse_sum
+    PUSH               OFFSET sum_num_txt
+    PUSH               OFFSET display_title
+    PUSH               OFFSET sum_txt
+    PUSH               OFFSET average_txt
+    PUSH               OFFSET finalNumArray
+    PUSH               OFFSET finalStrArray
+    PUSH               OFFSET count_1
+    PUSH               OFFSET count_2
+    CALL               WriteVal
+
+; -------------
+; Say goodbye
+; -------------
+    MOV                EDX, OFFSET farewell_txt
+    CALL               WriteString
+    CALL               CrLf
+    CALL               CrLf
+
+      Invoke ExitProcess,0	         ; exit to operating system
+main ENDP
+
+
+; -----------------------------------------------------------------------------------------------------------
+; Name: ReadVal
+;
+; Promps to get a signed integer from a user, gets the string from a user. Converts the string to its numneral value.
+; Uses the mGetString macro to prompt and get the string.
+;
+; Postconditions: The values in the arrays passed are modified with user data.
+;
+; Receives: * From closest to CALL to furthest *
+;           Address of a SDWORD that stores the converted_num.
+;           Address of a DWORD that stores the num_passed status.
+;           Address of an array that will store the converted numerals.
+;           LENGTHOF the array that stores string entered by user.
+;           Address of an SDWORD array that will store the strings entered by user.
+;           Address of a string that will display the error text.
+;           Address of a string that will display the prompt.
+;           Address of an SDWORD that will store the user's input inside the procedure.
+;           Address of an SDWORD that will be used to convert the user's number.
+;
+; Returns: String entered by the user is stored in an array.
+;          Converted number from the string entered by user is stored in an array.
+; ------------------------------------------------------------------------------------------------------------
+ReadVal                PROC    USES	EAX EBX ECX EDX ESI EDI
+    LOCAL              userInput[16]:BYTE
+    PUSH               EBP                          ; Build Stack Frame
+    MOV                EBP, ESP
+    MOV                EAX, [EBP+84]                ; address of convert_num_2 to EAX.
+    MOV                ESI, [EBP+80]                ; address of user_input to ESI.
+    MOV                EAX, [EBP+76]                ; address of prompt_1 to EAX
+    MOV                EBX, [EBP+72]                ; address of error_txt to EBX
+    MOV                EDX, [EBP+68]                ; address of str_array
+    MOV                EDI, [EBP+64]                ; len of str_array
+    MOV                EDI, [EBP+60]                ; address of num_array
+    MOV                ECX, [EBP+56]                ; address of num_passed
+    MOV                ECX, [EBP+52]                ; address of convert_num
+    MOV                ECX, ARRAYSIZE
+
+_getNum:
+    PUSH               EAX                          ; Saves these registers.
+    PUSH               ESI
+    PUSH               ECX
+    mGetString         EAX, ESI, LENGTHOF userInput     ; Address of user string in ESI, number of character in EAX.
+    POP                ECX
+    CMP                EAX, 0                           ; Check for no number input.
+    JE                 _nopopError
+    CMP                EAX, 11                          ; Check for input larger than 32 bit signed int.
+    JA                 _nopopError
+
+_validate:
+    PUSH               ECX                          
+    MOV                ECX, EAX                     ; EAX stores the length of the input from the user.
+    MOV                EDX, EAX                     ; Saves user char length in EDX.
+_valLoopStart:
+    LODSB                                           ; Loads char from input.
+    CMP                AL, 57                       ; If char is greater than ascii value, it is not a number.
+    JA                 _printError
+    CMP                AL, 48                       ; If char is less than ascii value, it is not a number (but it might be + or -, so we will check).
+    JL                 _plusMinusCheck
+
+_nextLoop:
+    LOOP               _valLoopStart                ; Checks each char in user input.
+    POP                ECX
+    JMP                _numPassed                   ; All chars have passed.
+
+_plusMinusCheck:
+    CMP                ECX, EDX                     ; Compares ECX (holding the count) to EDX, which holds how many chars usr entered.
+    JNE                _printError                  ; If this isn't the first time the loop is running for this number, reject. + or - can only be at beginning.
+    CMP                AL, 45                       ; If the first char is "-".
+    JE                 _nextLoop
+    CMP                AL, 43                       ; If the first char is "+".
+    JE                 _nextLoop
+    JMP                _printError
+
+_numPassed:
+    POP                ESI
+    MOV                EBX, [ESI]                       ; String(first element) from user to EBX.
+    MOV                [EDI], EBX                       ; Moves entered string to str_array.
+    POP                EAX
+
+; ---------------------------------------------------------------------------------------------
+; Begings convervision of number from string to numeral.
+; ---------------------------------------------------------------------------------------------
+    MOV                ECX, EDX                        ; number of charactes in input in ECX.
+    MOV                ESI, [EBP+80]                   ; Address of user_input to ESI.
+    LEA                EAX, [EBP+84]                   ; Address of convert_num_2 to EAX.
+    MOV                EAX, 0
+
+_convertLoop:
+    LODSB                                             ; Loads from string user input in ESI.
+    CMP                EAX, 43                        ; If the first char is "+".
+    JE                 _plusChar
+    CMP                EAX, 45                        ; If the first char is "-".
+    JE                 _minusChar
+    SUB                EAX, 48                        ; Converted ascii value to numberal.
+    CMP                ECX, 1                         ; Our break case, upon which the number should be converted.
+    JNE                _mulNum
+    MOV                [EDI], EAX                     ; Moves the converted number to num_array
+    ADD                EDI, 4                         ; Increments EDI to next value.
+
+; -----------------------------------------------------------------------------------------------------------------
+; Add the individually converted numbers together to create the correct numeral value.
+; -----------------------------------------------------------------------------------------------------------------
+    MOV                EDI, [EBP+60]                  ; Address of num_array to EDI.
+    MOV                ECX, EDX                       ; EDX has stored number of chars in input.
+    MOV                EBX, 0
+_addConvertLoop: 
+    MOV                EAX, [EDI]                     ; Value in num_array
+    CMP                EAX, 45                        ; Check if first val is "-".
+    JE                 _minusMul
+    ADD                EBX, EAX                       
+    JC                 _printError                    ; If the number is larger than a signed 32 bit int.
+    ADD                EDI, 4
+    LOOP               _addConvertLoop
+_numberConverted:
+    MOV                EDI, [EBP+52]                  ; Address of convert_num to EDI.
+    MOV                [EDI], EBX
+    ADD                EDI, 4
+
+_return:                                              ; Set num_passed to 1 and return.
+    MOV                EAX, [EBP+56]                  ; Address of num_passed to EAX.
+    MOV                EBX, 1
+    MOV                [EAX], EBX                     ; Sets num_passed to "1" (True).
+    POP                EBP                            ; Tear down Stack Frame.
+    RET                36
+
+; --------------------------------------------------------------------------------------
+; Multiplies the individual chars to match their place in the finsihed converted number.
+; ie, if the number from the user is "156", it will get 1 as the first character,
+; recognize that there are three characters in the input. So it will multiply 1 times 10
+; 1 minus the number of characters left (2 times in this case to generate 100. It will
+; then move to the next character and repeat the process to generate our correctly
+; converted number.
+; ---------------------------------------------------------------------------------------
+_mulNum:
+    PUSH               EAX                            ; Saves registers.
+    PUSH               EDX
+    PUSH               ECX
+    DEC                ECX                            ; Accounts for valid number of times to multiply.
+    MOV                EBX, 10                        ; We will be multiplying by EBX.
+_mulLoop:
+    MUL                EBX
+    JC                 _printError
+    LOOP               _mulLoop                       
+    MOV               [EDI], EAX                      ; Now the number, having finished being multiplied, gets added to the array.
+    ADD                EDI, 4
+    POP                ECX
+    POP                EDX
+    POP                EAX
+    LOOP               _convertLoop
+    JMP               _convertLoop
+
+; ----------------------------------------------------
+; The first char is "+", throw it away and move
+; to the next character.
+; Both ECX and EDX are counting charcters so decrement
+; both.
+; ----------------------------------------------------
+_plusChar:
+    DEC                ECX
+    DEC                EDX
+    JMP                _convertLoop
+
+; ----------------------------------------------------
+; The first char is "-", add it to the array but skip
+; multiplying it.
+; ----------------------------------------------------
+_minusChar:
+    MOV                [EDI], EAX
+    ADD                EDI, 4
+    DEC                ECX
+    JMP                _convertLoop
+
+; ----------------------------------------------------
+; Multiplies negative numbers by first multiplying it
+; by 1 to get the non negative value.
+; * This would be better implemented as a subprocedure
+; That checks if the number is negative.
+; ----------------------------------------------------
+_minusMul:
+    MOV                EBX, -1
+    ADD                EDI, 4
+    MOV                EAX, [EDI]
+    MUL                EBX
+    MOV                EBX, 0
+    ADD                EBX, EAX
+    ADD                EDI, 4
+    DEC                ECX
+
+; ----------------------------------------------------
+; Subtracts the value at the array from the negative
+; value, for each value.
+; ----------------------------------------------------
+_subConvertLoop: 
+    MOV                EAX, [EDI]
+    SUB                EBX, EAX
+    JC                 _printError
+    ADD                EDI, 4
+    LOOP               _subConvertLoop
+    JMP                _numberConverted
+
+; ----------------------------------------------------
+; This handles scenarios while POP ECX is needed for
+; stack balancing.
+; ----------------------------------------------------
+_printError:
+    MOV                EDX, [EBP+72]                  ; error_txt to EDX.
+    mDisplayString     EDX
+    CALL               CrLf
+    MOV                EAX, [EBP+56]                  ; Address of num_passed to EAX.
+    MOV                EBX, 0
+    MOV                [EAX], EBX                     ; Sets num_passed to "0" (False).
+    POP                ECX
+    POP                ESI
+    POP                EAX
+    POP                EBP
+    RET                36
+
+_nopopError:
+    MOV                EDX, [EBP+72]                  ; error_txt to EDX.
+    mDisplayString     EDX
+    CALL               CrLf
+    MOV                EAX, [EBP+56]                  ; Address of num_passed to EAX.
+    MOV                EBX, 0
+    MOV                [EAX], EBX                     ; Sets num_passed to "0" (False).
+    POP                ESI
+    POP                EAX
+    POP                EBP
+    RET                36
+
+ReadVal                ENDP
+
+; -----------------------------------------------------------------------------------------------------------
+; Name: WriteVal
+;
+; Converts an array of numeric values into a byte array (string) which is then displayed to the user.
+; The sum and truncated average of the numbers passed are calculated and displayed.
+;
+; Uses the mDisplayString macro in several locations.
+;
+; Preconditions: an SDWORD array is passed containing the numbers to be converted. 
+;
+; Postconditions: Arrays/contents of addresses passed are populated with info/changed.
+;
+; Receives: * From closest to CALL to furthest *
+;           Two addresses of DWORDS that will store seperate counts.
+;           Address of a byte array that will store the converted numbers to a string to display to the user.
+;           Address of a SDWORD num array that contains the numbers to be converted.
+;           Address of the title to display before showing the average.
+;           Address of the title to display before showing the sum.
+;           Address of the title to display before showing the converted string.
+;           Address of a byte array to store the converted sum string.
+;           Address of a byte array to store the converted reversed string.
+;           Address of an SDWORD to store the average.
+;           Address of a byte array to store the converted sum string.
+;           Address of an SDWORD to store the calculated sum.
+;
+; Returns:
+;           The calculated sum and average are returned to their passed memory locations.
+;           The passed string addresses are populated and displayed to the screen.
+; ------------------------------------------------------------------------------------------------------------
+WriteVal               PROC    USES	EAX EBX ECX EDX ESI EDI
+    LOCAL              printStr:DWORD
+    PUSH               EBP                          ; Build Stack Frame
+    MOV                EBP, ESP
+    MOV                ECX, [EBP+84]                ; Address of sum_store
+    MOV                ECX, [EBP+80]                ; Address of avg_txt
+    MOV                ECX, [EBP+76]                ; Address of avg_num
+    MOV                ECX, [EBP+72]                ; Address of reverse_sum
+    MOV                ECX, [EBP+68]                ; Address of sum_num_txt
+    MOV                EDX, [EBP+64]                ; Address of display_title
+    MOV                ECX, [EBP+60]                ; Address of sum_txt
+    MOV                ECX, [EBP+56]                ; Address of average_txt
+    MOV                ESI, [EBP+52]                ; Address of finalNumArray to ESI
+    MOV                EDI, [EBP+48]                ; Address of finalStrArray to EDI
+    MOV                ECX, [EBP+44]                ; Address of count_1 to ECX
+    MOV                ECX, [EBP+40]                ; Address of count_2 to ECX
+
+    CALL               CrLf
+    mDisplayString     EDX
+    MOV                ECX, ARRAYSIZE
+    MOV                EAX, [EBP+44]                ; Address of count_1 to EAX
+    MOV                [EAX], ECX                   ; Sets count_1 to ARRAYSIZE
+    MOV                EBX, 10                      ; We will be dividing by 10 to convert the number.
+_convertLoop:
+    MOV                EAX, [EBP+44]                ; Address of count_1 to EAX
+    MOV                [EAX], ECX                   ; Sets count_1 to updated ECX val.
+    MOV                EAX, [ESI]                   ; First val of finalNumArray to EAX
+    LEA                EDI, printStr
+    PUSH               ECX
+    MOV                ECX, 0                       ; Clears ECX for count incrementaion.
+    CLD                                             ; Clears direction flag.
+    LODSB                                           ; Loads first val of finalNumArray to EAX.
+    CMP                EAX, 2147483647              ; Maximum 32bit signed positive value. If it is greater than this, it is negative.
+    JA                 _negVal
+    CMP                EAX, 9                       ; If the value is a single digit.
+    JA                 _divLoop
+    JMP                _singleChar
+
+; ------------------------------------------------------
+; The reverse of the process in ReadVal, this divides
+; The converted number by 10, stores the remainder
+; as a ascii value in local variable printStr,
+; continues until the dividend is 0. The resulting
+; string will be in reverse.
+; ------------------------------------------------------
+_divLoop:
+    MOV                EBX, 10
+    CDQ
+    IDIV               EBX
+    ADD                EDX, 48
+    PUSH               EAX
+    MOV                AL, DL
+    STOSB
+    POP                EAX
+    INC                ECX                           ; Counts how many characters were added.
+    CMP                EAX, 0
+    JNE                _divLoop
+    JMP                _nextNum
+
+_nextNum:
+    ADD                ESI, 3                        ; Gets next location in ESI (3 since LODSB has already incremeneted by 1).
+    CLD
+
+; --------------------------------------------------------------------------------------------------
+; Setup for the reveral of the string stored in printStr.
+;
+; * These reversal processes would be better utilized as a subprocedure that could be called within
+; WriteVal with checks for negative and single values.
+; --------------------------------------------------------------------------------------------------
+_reverseStore:
+    MOV                EBX, ECX                      ; Saves the count in EBX.
+    PUSH               ESI
+    PUSH               EDI
+    LEA                ESI, printStr                 ; Moves the reversed ascii value generated above to ESI.
+    MOV                EDI, [EBP+48]                 ; Address of finalStrArray to EDI
+    PUSH               ECX
+    MOV                ECX, [EBP+40]                 ; Address of count_2 to ECX. Count_2 will store the count of all values in the array.
+    MOV                EAX, [ECX]                    ; Value in count_2 to EAX
+    ADD                EAX, EBX                      ; Adds the count of the current character to value in count_2
+    ADD                EAX, 2                        ; Increments by 2 for the "," and " " character.
+    ADD                EDI, EAX                      
+    MOV                [ECX], EAX                    ; Updates count_2 to new value.
+    POP                ECX
+
+; --------------------------------------------------------------
+; Reverses the string in printStr, stores the reversed string
+; in finalStrArray.
+; --------------------------------------------------------------
+
+_revLoop:
+    CLD
+    LODSB
+    STD
+    STOSB
+    LOOP                _revLoop
+    ADD                EDI, EBX
+    INC                EDI
+    CLD
+
+    MOV                EAX, [EBP+44]                  ; Address of count_1 to EAX
+    MOV                ECX, [EAX]                     ; Value in count_1 to ECX
+    CMP                ECX, 1                         ; Our exit case, on the last character.
+    JE                 _exit
+
+    MOV                AL, ","                        ; Adds to the string "," and " " to the end of each number for formatting.
+    STOSB
+    MOV                AL, " "
+    STOSB
+    POP                EDI
+    POP                ESI
+    POP                ECX
+    MOV                EAX, [EBP+44]                  ; Address of count_1 to EAX
+    MOV                ECX, [EAX]                     ; Value in count_1 to ECX
+
+; ------------------------------------------------------------
+; Loops for each number in the array. Exits to _writeToScreen
+; ------------------------------------------------------------
+_jmpConvert:
+    LOOP               _convertLoop                   ; Converts and reverses each number in the array.
+    JMP                _writeToScreen
+
+; ----------------------------------------------------------------
+; Catches the case of single digit numbers. Does not divide them.
+; ----------------------------------------------------------------
+_singleChar:
+    CLD
+    MOV                EBX, [EBP+40]                  ; Address of count_2 to EBX
+    MOV                ECX, [EBX]
+    INC                ECX
+    ADD                ECX, 2
+    MOV                [EBX], ECX
+    MOV                EDI, [EBP+48]                  ; Address of finalStrArray to EDI
+    ADD                EDI, ECX                       ; Add count_2 to finalStrArray
+    ADD                AL, 48
+    STOSB
+
+    MOV                EAX, [EBP+44]                  ; Address of count_1 to EAX
+    MOV                ECX, [EAX]                     ; Value in count_1 to ECX
+    CMP                ECX, 1
+    JE                 _exit
+    MOV                AL, ","
+    STOSB
+    MOV                AL, " "
+    STOSB
+    ADD                ESI, 3
+    CLD
+
+; -----------------------------------------------------
+; Sets up exits for each number conversion. 
+; Handles negative values differently to balance stack.
+; -----------------------------------------------------
+_exit:
+    MOV                EAX, [ESI]
+    CMP                EAX, 2147483647
+    JA                 _negExit
+    POP                ECX
+    MOV                EAX, [EBP+44]                  ; Address of count_1 to EAX
+    MOV                ECX, [EAX]                     ; Value in count_1 to ECX
+    JMP                _jmpConvert
+
+_negExit:
+    POP                EDI
+    POP                ESI
+    POP                ECX
+    MOV                EAX, [EBP+44]                  ; Address of count_1 to EAX
+    MOV                ECX, [EAX]                     ; Value in count_1 to ECX
+    JMP                _jmpConvert
+
+; -------------------------------------------------------------------------------------------
+; Converts the negative value to positive, then divides as before, and adds a "-" at the end.
+; -------------------------------------------------------------------------------------------
+_negVal:
+    MOV                EBX, -1
+    MUL                EBX
+_negDivLoop:
+    MOV                EBX, 10
+    CDQ
+    IDIV               EBX
+    ADD                EDX, 48
+    PUSH               EAX
+    MOV                AL, DL
+    STOSB
+    POP                EAX
+    INC                ECX
+    CMP                EAX, 0
+    JNE                _negDivLoop
+    MOV                AL, '-'
+    STOSB
+    INC                ECX
+    JMP                _nextNum
+
+_writeToScreen:
+    MOV                EDX, [EBP+48]          ; Address of finalstrArray to EDX.
+    ADD                EDX, 3                 ; Needed to start the string exactly at the memory address. Without this the string began with null and would not print.
+    CALL               CrLf
+    mDisplayString     EDX
+    CALL               CrLf
+    CALL               CrLf
+
+; -----------------------------------------------------------------------------
+; Section to calculate and display the sum of the numbers entered by the user.
+; -----------------------------------------------------------------------------
+    MOV                EDX, [EBP+60]          ; Address of sum_txt to EDX.
+    mDisplayString     EDX
+
+    MOV                ESI, [EBP+52]          ; Address of finalNumArray to ESI
+    MOV                EDI, 0                 ; EDI will store sum, zero it out.
+    MOV                ECX, ARRAYSIZE         ; Count for amount of numbers given by user.
+
+_sumLoop:
+    MOV                EAX, [ESI]             ; Gets value (starting with first) in finalNumArray
+    CMP                EAX, 2147483647        ; Maximum 32bit signed positive value. If it is greater than this, it is negative.
+    JA                 _negSum                ; if number is negative...
+    ADD                EDI, EAX               ; Otherwise add current number to the store.
+    JMP                _loopPlz               ; And loop for every number.
+
+_negSum:
+    MOV                EBX, -1                ; If current value is negative.
+    MUL                EBX                    ; Convert it to positve.
+    SUB                EDI, EAX               ; and subtract it from current sum store.
+
+_loopPlz:
+    ADD                ESI, 4                 ; Gets the next number.
+    LOOP               _sumLoop               ; Loop for every number.
+
+    MOV                EAX, [EBP+84]          ; Address of sum_store to EAX.
+    MOV                [EAX], EDI             ; Stores the numeric sum value in sum_store for later avg calculation.
+    
+    CMP                EDI, 2147483647        ; Checks if the sum is negative.
+    JA                 _negSumSetup
+
+    CMP                EDI, 10                ; Checks if the sum is a single digit.
+    JL                 _singleCharSum
+    
+; -------------------------------------------------------------------
+; Otherwise converts the number in sum to ascii values to be printed.
+; This too could be a subprocedure with the applicable values passed.
+; -------------------------------------------------------------------
+    MOV                EAX, EDI
+    MOV                EBX, 10
+    MOV                EDI, [EBP+68]         ; Address of sum_num_txt to EDI
+    MOV                ECX, 0
+
+_divSumLoop:
+    CDQ
+    IDIV               EBX
+    ADD                EDX, 48
+    PUSH               EAX
+    MOV                AL, DL
+    STOSB
+    POP                EAX
+    INC                ECX
+    CMP                EAX, 0
+    JNE                _divSumLoop
+    MOV                ESI, [EBP+68]       ; Address of sum_num_txt to ESI
+    MOV                EDI, [EBP+72]       ; Adress of reverse_sum to EDI
+    JMP                _revSumLoop
+
+; -------------------------------------------
+; Convert a single digit sum to ascii value.
+; -------------------------------------------
+_singleCharSum:
+    MOV                EAX, EDI
+    ADD                AL, 48
+    MOV                EDI, [EBP+72]       ; Address of reverse_sum to EDI.
+    STOSB
+    MOV                EDX, EDI
+    SUB                EDX, 1              ; Balances stack for printing to screen.
+    JMP                _displaySum
+
+_negSumSetup:
+    MOV                EAX, EDI
+    MOV                EBX, -1
+    MUL                EBX
+    MOV                EBX, 10
+    MOV                EDI, [EBP+68]         ; Address of sum_num_txt to EDI
+
+; -------------------------------------------------------------------
+; Converts a negative sum to ascii values to be printed.
+; This too could be a subprocedure with the applicable values passed.
+; -------------------------------------------------------------------
+_negSumLoop:
+    CDQ
+    IDIV               EBX
+    ADD                EDX, 48
+    PUSH               EAX
+    MOV                AL, DL
+    STOSB
+    POP                EAX
+    INC                ECX
+    CMP                EAX, 0
+    JNE                _negSumLoop
+    MOV                AL, '-'
+    STOSB
+    INC                ECX
+    MOV                ESI, [EBP+68]       ; Address of sum_num_txt to ESI
+    MOV                EDI, [EBP+72]       ; Adress of reverse_sum to EDI
+
+; ----------------------------------------
+; Reverses a negative sum in sum_num_txt
+; and puts it in reverse_sum.
+; ----------------------------------------
+_negRevSumLoop:
+    CLD
+    LODSB
+    STD
+    STOSB
+    LOOP                _negRevSumLoop
+    MOV                EDX, EDI            ; Setup for _displaySum, it prints EDX. Puts the string in EDI to EDX.
+    ADD                EDX, 1              ; Balances for printing. Otherwise the string starts with a null.
+
+_displaySum:
+    mDisplayString     EDX
+    CALL               CrLf
+    CALL               CrLf
+    JMP                _calcAvg            ; Jump to calculate the average.
+
+_revSumLoop:
+    CLD
+    LODSB
+    STD
+    STOSB
+    LOOP                _revSumLoop
+    MOV                 EDX, EDI
+    ADD                 EDX, 1
+    JMP                 _displaySum
+
+; -------------------------------------------------------------------------
+; Caclulated the average by taking the sum generated earlier and stored in
+; in sum_store and divides it by the amount of numbers entered by the user.
+; -------------------------------------------------------------------------
+_calcAvg:
+    MOV                EDX, [EBP+56]          ; Address of average_txt to EDX.
+    mDisplayString     EDX
+
+    MOV                EBX, [EBP+84]          ; Address of sum_store to EBX
+    MOV                EAX, [EBX]             ; value in sum_store (sum) to EAX.
+    CMP                EAX, 2147483647        ; Checks for a negative sum.
+    JA                 _negAvgSetup           
+    MOV                EBX, ARRAYSIZE
+    CDQ
+    IDIV               EBX            
+    CMP                EAX, 10                ; Checks for a single digit sum.
+    JL                 _singleCharAvg
+    JMP                _avgSetup
+
+_singleCharAvg:
+    ADD                AL, 48
+    MOV                EDI, [EBP+76]          ; Address of avg_num to EDI.
+    STOSB
+    MOV                EDX, EDI
+    SUB                EDX, 1                 ; Balances string for printing.
+    JMP                _displayAvg
+
+; ----------------------------------------------------
+; As seen before, converts the number to ascii values
+; By dividing by 10 and storing the remainder.
+; ----------------------------------------------------
+_avgSetup:
+    MOV                EDI, [EBP+76]          ; Address of avg_num to EDI.
+_avgLoop:
+    CDQ
+    IDIV               EBX
+    ADD                EDX, 48
+    PUSH               EAX
+    MOV                AL, DL
+    STOSB
+    POP                EAX
+    INC                ECX
+    CMP                EAX, 0
+    JNE                _avgLoop
+    MOV                ESI, [EBP+76]       ; Address of avg_num to ESI
+    MOV                EDI, [EBP+80]       ; Adress of avg_txt to EDI
+    ADD                EDI, ECX
+
+; --------------------------------------------
+; Reverses the average stored in avg_num.
+; Stores the reversed text average in avg_txt
+; --------------------------------------------
+_revAvgLoop:
+    CLD
+    LODSB
+    STD
+    STOSB
+    LOOP               _revAvgLoop
+    MOV                EDX, EDI
+    ADD                EDX, 1
+    JMP                _displayAvg
+
+; -----------------------------------------
+; Same as above but for a negative average.
+; -----------------------------------------
+_negAvgSetup:
+    MOV                EBX, -1
+    MUL                EBX
+    MOV                EBX, ARRAYSIZE
+    CDQ
+    IDIV               EBX
+    MOV                EBX, 10
+    MOV                EDI, [EBP+76]         ; Address of avg_num to EDI
+
+_negAvgLoop:
+    CDQ
+    IDIV               EBX
+    ADD                EDX, 48
+    PUSH               EAX
+    MOV                AL, DL
+    STOSB
+    POP                EAX
+    INC                ECX
+    CMP                EAX, 0
+    JNE                _negAvgLoop
+    MOV                AL, '-'
+    STOSB
+    INC                ECX
+    MOV                ESI, [EBP+76]       ; Address of avg_num to ESI
+    MOV                EDI, [EBP+80]       ; Adress of avg_txt to EDI
+    ADD                EDI, ECX
+
+_negRevAvgLoop:
+    CLD
+    LODSB
+    STD
+    STOSB
+    LOOP               _negRevAvgLoop
+    MOV                EDX, EDI
+    ADD                EDX, 1
+
+_displayAvg:
+    mDisplayString     EDX
+    CALL               CrLf
+    CALL               CrLf  
+
+_jobDone:
+    POP                EBP
+    RET                48
+
+WriteVal               ENDP
+
+END main
