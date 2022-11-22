@@ -55,9 +55,9 @@ ENDM
 ARRAYSIZE   = 10
 
 .data
-    intro_1		       BYTE    "Hello, my name is Matthew...",0
-	intro_2            BYTE    "and this is my String Primitives and Macros Program!",0
-	intro_3            BYTE    "I will prompt you to enter 10 signed decimal integers.",0
+    intro_1	       BYTE    "Hello, my name is Matthew...",0
+    intro_2            BYTE    "and this is my String Primitives and Macros Program!",0
+    intro_3            BYTE    "I will prompt you to enter 10 signed decimal integers.",0
     intro_4            BYTE    "Each number needs to fit inside a 32 bit register.",0
     intro_5            BYTE    "After you have finished entering numbers, I will display a list of the integers, their sum, and their average value.",0
     prompt_1           BYTE    "Please enter a signed number: ",0
