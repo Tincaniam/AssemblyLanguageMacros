@@ -121,7 +121,7 @@ _readValLoop:
     CALL               ReadVal
 
     MOV                EAX, convert_num       ; convert_num stores the ascii values converted from a string.
-    CMP                num_passed, 1          ; num_passed holds weather the passed number is valid (1 = True).
+    CMP                num_passed, 1          ; num_passed holds whether the passed number is valid (1 = True).
     JNE                _readValLoop
     MOV                [ESI], EAX
     ADD                ESI, 4                 ; Increments finalNumArray to the next value.
