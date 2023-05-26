@@ -156,7 +156,7 @@ main ENDP
 ; -----------------------------------------------------------------------------------------------------------
 ; Name: ReadVal
 ;
-; Promps to get a signed integer from a user, gets the string from a user. Converts the string to its numneral value.
+; Prompts to get a signed integer from a user, gets the string from a user. Converts the string to its numneral value.
 ; Uses the mGetString macro to prompt and get the string.
 ;
 ; Postconditions: The values in the arrays passed are modified with user data.
